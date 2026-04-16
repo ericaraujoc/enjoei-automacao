@@ -1,32 +1,31 @@
 name: Enjoei Megafonar Automático
- 
+
 on:
   schedule:
     - cron: '0 * * * *'  # Roda 1x por hora (o script faz 5 ciclos internos de 10min)
   workflow_dispatch:       # Permite rodar manualmente também
- 
+
 jobs:
   run-script:
     runs-on: ubuntu-latest
     timeout-minutes: 55   # Evita que o job fique preso indefinidamente
- 
+
     steps:
       - name: Checkout código
         uses: actions/checkout@v4
- 
+
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
- 
+
       - name: Instalar dependências
         run: |
           python -m pip install --upgrade pip
           pip install playwright
           playwright install chromium
- 
+
       - name: Executar Script
         env:
           ENJOEI_COOKIE: ${{ secrets.ENJOEI_COOKIE }}
         run: python enjoei_automacao.py
- 
