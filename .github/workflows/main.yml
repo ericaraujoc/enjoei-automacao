@@ -2,7 +2,7 @@ name: Enjoei Megafonar Automático
 
 on:
   schedule:
-    - cron: '*/10 * * * *'  # Roda 1x por hora (o script faz 5 ciclos internos de 10min)
+    - cron: '0 * * * *'  # Roda 1x por hora (o script faz 5 ciclos internos de 10min)
   workflow_dispatch:       # Permite rodar manualmente também
 
 jobs:
