@@ -1,6 +1,7 @@
 import asyncio
 import os
 import logging
+import time
 
 from playwright.async_api import async_playwright
 
@@ -10,23 +11,26 @@ logging.basicConfig(
     format='%(asctime)s - %(levelname)s - %(message)s'
 )
 
-# Configurações Globais
-ENJOEI_COOKIE = os.getenv("ENJOEI_COOKIE")
-LOJA_URL = "https://www.enjoei.com.br/@ericshop"
-
-CICLOS = 10           # Quantos ciclos por run (5 ciclos x 10min = ~50min)
-INTERVALO_MINUTOS = 5   # Minutos entre cada ciclo
+# ============================================================
+# ⚙️  CONFIGURAÇÕES — edite aqui conforme necessário
+# ============================================================
+ENJOEI_COOKIE      = os.getenv("ENJOEI_COOKIE")
+LOJA_URL           = "https://www.enjoei.com.br/@ericshop"
+INTERVALO_MINUTOS  = 5      # ⏱ Minutos entre cada rodada de megafonar
+DURACAO_TOTAL_MIN  = int(os.getenv("DURACAO_TOTAL_MIN", 355))  # ⏳ Injetado pelo job
+# ============================================================
 
 
 async def executar_megafonar():
+    """Abre o browser, faz login via cookie e clica em todos os botões de megafonar disponíveis."""
     async with async_playwright() as p:
         try:
             browser = await p.chromium.launch(headless=True)
             context = await browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                           "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
 
-            # Adiciona Cookie de sessão
             await context.add_cookies([{
                 'name': '_website_session_7',
                 'value': ENJOEI_COOKIE,
@@ -39,38 +43,36 @@ async def executar_megafonar():
 
             page = await context.new_page()
 
-            # Acessa a loja
-            logging.info(f"🔗 Acessando a loja: {LOJA_URL}")
+            logging.info(f"🔗 Acessando: {LOJA_URL}")
             await page.goto(LOJA_URL, wait_until="domcontentloaded", timeout=60000)
             await asyncio.sleep(5)
 
-            # Verifica Login — procura elemento que só aparece quando logado
+            # Verifica login
             try:
                 logado = await page.locator('[data-testid="user-menu"], .user-avatar, .logout-btn').first.is_visible(timeout=5000)
             except Exception:
                 logado = False
 
-            # Fallback: se botão "entrar" estiver visível, não está logado
             if not logado:
                 try:
                     entrar_visivel = await page.locator('a:has-text("entrar"), button:has-text("entrar")').first.is_visible(timeout=3000)
                     if entrar_visivel:
-                        logging.error("❌ ERRO: Robô NÃO está logado. Atualize o ENJOEI_COOKIE.")
+                        logging.error("❌ NÃO está logado. Atualize o ENJOEI_COOKIE.")
                         await browser.close()
                         return 0
                 except Exception:
                     pass
 
             # Rolagem progressiva para carregar todos os produtos
-            logging.info("📜 Rolando página para carregar produtos...")
+            logging.info("📜 Carregando produtos...")
             for _ in range(6):
                 await page.evaluate("window.scrollBy(0, 800)")
                 await asyncio.sleep(1)
 
-            # Localiza botões de megafonar
+            # Clica em todos os botões disponíveis
             buttons = page.locator('button').filter(has_text="megafonar")
             count = await buttons.count()
-            logging.info(f"✅ Encontrados {count} botões de megafonar.")
+            logging.info(f"🔎 {count} botões encontrados.")
 
             clicked = 0
             for i in range(count):
@@ -78,51 +80,64 @@ async def executar_megafonar():
                     btn = buttons.nth(i)
                     btn_text = await btn.inner_text()
 
-                    # Pula botões que já foram megafonados recentemente
                     if "agora" in btn_text.lower():
-                        logging.info(f"   → [{i+1}] Já megafonado recentemente, pulando.")
-                        continue
+                        continue  # Ainda em cooldown, pula
 
                     await btn.scroll_into_view_if_needed()
                     await btn.click(timeout=5000)
                     clicked += 1
-                    logging.info(f"   → [{clicked}] Megafonado com sucesso!")
-                    await asyncio.sleep(2)  # Pausa para não ser bloqueado
+                    logging.info(f"   ✅ [{clicked}] Megafonado!")
+                    await asyncio.sleep(2)
 
                 except Exception as e:
-                    logging.warning(f"   → Erro no botão {i+1}: {e}")
+                    logging.warning(f"   ⚠️ Erro no botão {i+1}: {e}")
                     continue
 
-            logging.info(f"🎉 Ciclo finalizado: {clicked} megafonadas.")
+            logging.info(f"🎉 Rodada finalizada: {clicked} megafonadas.")
             await browser.close()
             return clicked
 
         except Exception as e:
-            logging.error(f"🚨 Falha na execução: {e}")
+            logging.error(f"🚨 Falha: {e}")
             return 0
 
 
 async def main():
     if not ENJOEI_COOKIE:
-        logging.error("❌ ENJOEI_COOKIE não encontrado nas variáveis de ambiente.")
+        logging.error("❌ ENJOEI_COOKIE não encontrado.")
         return
 
-    logging.info(f"🚀 Iniciando automação — {CICLOS} ciclos de {INTERVALO_MINUTOS} minutos cada.")
-    total_megafonadas = 0
+    inicio = time.time()
+    limite_segundos = DURACAO_TOTAL_MIN * 60
+    total = 0
+    rodada = 0
 
-    for ciclo in range(1, CICLOS + 1):
-        logging.info(f"\n{'='*40}")
-        logging.info(f"🔁 Ciclo {ciclo}/{CICLOS}")
-        logging.info(f"{'='*40}")
+    logging.info(f"🚀 Iniciando — rodadas a cada {INTERVALO_MINUTOS} min por {DURACAO_TOTAL_MIN} min.")
+
+    while True:
+        tempo_decorrido = time.time() - inicio
+
+        if tempo_decorrido >= limite_segundos:
+            logging.info("⏹ Tempo limite atingido. Encerrando.")
+            break
+
+        rodada += 1
+        logging.info(f"\n{'='*40}\n🔁 Rodada {rodada}\n{'='*40}")
 
         megafonadas = await executar_megafonar()
-        total_megafonadas += megafonadas
+        total += megafonadas
 
-        if ciclo < CICLOS:
-            logging.info(f"⏳ Aguardando {INTERVALO_MINUTOS} minutos para o próximo ciclo...")
-            await asyncio.sleep(INTERVALO_MINUTOS * 60)
+        tempo_restante = limite_segundos - (time.time() - inicio)
 
-    logging.info(f"\n🏁 Automação concluída! Total de megafonadas: {total_megafonadas}")
+        if tempo_restante <= 60:
+            logging.info("⏹ Menos de 1 min restante. Encerrando.")
+            break
+
+        espera = min(INTERVALO_MINUTOS * 60, tempo_restante - 60)
+        logging.info(f"⏳ Próxima rodada em {int(espera/60)}min {int(espera%60)}s...")
+        await asyncio.sleep(espera)
+
+    logging.info(f"\n🏁 Total de megafonadas na sessão: {total}")
 
 
 if __name__ == "__main__":
