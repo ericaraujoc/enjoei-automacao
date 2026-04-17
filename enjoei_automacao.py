@@ -16,7 +16,7 @@ logging.basicConfig(
 # ============================================================
 ENJOEI_COOKIE      = os.getenv("ENJOEI_COOKIE")
 LOJA_URL           = "https://www.enjoei.com.br/@ericshop"
-INTERVALO_MINUTOS  = 5      # ⏱ Minutos entre cada rodada de megafonar
+INTERVALO_MINUTOS  = 10      # ⏱ Minutos entre cada rodada de megafonar
 DURACAO_TOTAL_MIN  = int(os.getenv("DURACAO_TOTAL_MIN", 355))  # ⏳ Injetado pelo job
 # ============================================================
 
