@@ -1,14 +1,18 @@
-name: Enjoei Megafonar Automático
+name: Enjoei Megafonar Automático 24h
 
 on:
   schedule:
-    - cron: '0 * * * *'  # Roda 1x por hora (o script faz 5 ciclos internos de 10min)
-  workflow_dispatch:       # Permite rodar manualmente também
+    - cron: '0 0 * * *'   # Inicia todo dia à meia-noite (cobre as 24h do dia)
+  workflow_dispatch:        # Permite rodar manualmente também
 
 jobs:
-  run-script:
+
+  # ─────────────────────────────────────────
+  # Bloco 1 — Horas 00h às 06h
+  # ─────────────────────────────────────────
+  bloco-1:
     runs-on: ubuntu-latest
-    timeout-minutes: 65   # Evita que o job fique preso indefinidamente
+    timeout-minutes: 360
 
     steps:
       - name: Checkout código
@@ -25,7 +29,95 @@ jobs:
           pip install playwright
           playwright install chromium
 
-      - name: Executar Script
+      - name: Executar Script (6h)
         env:
           ENJOEI_COOKIE: ${{ secrets.ENJOEI_COOKIE }}
+          DURACAO_TOTAL_MIN: 355
+        run: python enjoei_automacao.py
+
+  # ─────────────────────────────────────────
+  # Bloco 2 — Horas 06h às 12h
+  # ─────────────────────────────────────────
+  bloco-2:
+    needs: bloco-1
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install chromium
+
+      - name: Executar Script (6h)
+        env:
+          ENJOEI_COOKIE: ${{ secrets.ENJOEI_COOKIE }}
+          DURACAO_TOTAL_MIN: 355
+        run: python enjoei_automacao.py
+
+  # ─────────────────────────────────────────
+  # Bloco 3 — Horas 12h às 18h
+  # ─────────────────────────────────────────
+  bloco-3:
+    needs: bloco-2
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install chromium
+
+      - name: Executar Script (6h)
+        env:
+          ENJOEI_COOKIE: ${{ secrets.ENJOEI_COOKIE }}
+          DURACAO_TOTAL_MIN: 355
+        run: python enjoei_automacao.py
+
+  # ─────────────────────────────────────────
+  # Bloco 4 — Horas 18h às 24h
+  # ─────────────────────────────────────────
+  bloco-4:
+    needs: bloco-3
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Instalar dependências
+        run: |
+          python -m pip install --upgrade pip
+          pip install playwright
+          playwright install chromium
+
+      - name: Executar Script (6h)
+        env:
+          ENJOEI_COOKIE: ${{ secrets.ENJOEI_COOKIE }}
+          DURACAO_TOTAL_MIN: 355
         run: python enjoei_automacao.py
